@@ -15,6 +15,10 @@ def send_wecom_markdown(webhook: str, content: str) -> bool:
     if "://" not in webhook:
         webhook = "https://" + webhook
     import requests
+    # 企业微信 markdown 消息上限 4096 字节，超长截断（UTF-8 安全）
+    raw = content.encode("utf-8")
+    if len(raw) > 4000:
+        content = raw[:3950].decode("utf-8", errors="ignore") + "\n\n…（内容过长，已截断）"
     payload = {"msgtype": "markdown", "markdown": {"content": content}}
     try:
         r = requests.post(webhook, json=payload, timeout=10)
