@@ -6,6 +6,29 @@ import os
 
 # ---------- 企业微信 ----------
 
+def split_markdown(content: str, max_bytes: int = 3800) -> list:
+    """按段落拆分 markdown，保证每段 <= max_bytes 字节（UTF-8 安全）。"""
+    paras = content.split("\n\n")
+    chunks = []
+    cur = ""
+    for p in paras:
+        cand = (cur + "\n\n" + p) if cur else p
+        if len(cand.encode("utf-8")) <= max_bytes:
+            cur = cand
+        else:
+            if cur:
+                chunks.append(cur)
+            rest = p
+            while len(rest.encode("utf-8")) > max_bytes:
+                head = rest.encode("utf-8")[:max_bytes].decode("utf-8", errors="ignore")
+                chunks.append(head)
+                rest = rest[len(head):]
+            cur = rest
+    if cur:
+        chunks.append(cur)
+    return chunks or [""]
+
+
 def send_wecom_markdown(webhook: str, content: str) -> bool:
     """向企业微信群机器人发送 markdown 消息；webhook 为空时仅打印（干跑）。"""
     webhook = (webhook or "").strip()
@@ -15,20 +38,22 @@ def send_wecom_markdown(webhook: str, content: str) -> bool:
     if "://" not in webhook:
         webhook = "https://" + webhook
     import requests
-    # 企业微信 markdown 消息上限 4096 字节，超长截断（UTF-8 安全）
-    raw = content.encode("utf-8")
-    if len(raw) > 4000:
-        content = raw[:3950].decode("utf-8", errors="ignore") + "\n\n…（内容过长，已截断）"
-    payload = {"msgtype": "markdown", "markdown": {"content": content}}
-    try:
-        r = requests.post(webhook, json=payload, timeout=10)
-        data = r.json() if r.text else {}
-        ok = r.status_code == 200 and data.get("errcode") == 0
-        print(f"[push] 企业微信: {r.status_code} {json.dumps(data, ensure_ascii=False)}")
-        return ok
-    except Exception as e:  # noqa: BLE001
-        print(f"[push] 企业微信发送失败: {e}")
-        return False
+    chunks = split_markdown(content)
+    ok = True
+    for i, chunk in enumerate(chunks, 1):
+        if len(chunks) > 1:
+            chunk = f"**【{i}/{len(chunks)}】**\n{chunk}"
+        payload = {"msgtype": "markdown", "markdown": {"content": chunk}}
+        try:
+            r = requests.post(webhook, json=payload, timeout=10)
+            data = r.json() if r.text else {}
+            this_ok = r.status_code == 200 and data.get("errcode") == 0
+            print(f"[push] 企业微信[{i}/{len(chunks)}]: {r.status_code} {json.dumps(data, ensure_ascii=False)}")
+            ok = ok and this_ok
+        except Exception as e:  # noqa: BLE001
+            print(f"[push] 企业微信[{i}/{len(chunks)}]发送失败: {e}")
+            ok = False
+    return ok
 
 
 def get_webhook() -> str:
