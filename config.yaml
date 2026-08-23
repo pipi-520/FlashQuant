@@ -12,6 +12,7 @@ symbols:
     market: "cn"
     name: "贵州茅台"
     fixed_size: 100          # 每次开仓股数
+    lot_size: 100  # min trading unit (CN=100, US=1)
 
   - code: "000858"
     symbol: "000858"
@@ -19,6 +20,7 @@ symbols:
     market: "cn"
     name: "五粮液"
     fixed_size: 100
+    lot_size: 100  # min trading unit (CN=100, US=1)
 
   - code: "105.AAPL"         # 美股使用东财 secid（105=纳斯达克）
     symbol: "AAPL"
@@ -26,6 +28,7 @@ symbols:
     market: "us"
     name: "苹果"
     fixed_size: 100
+    lot_size: 1  # min trading unit (CN=100, US=1)
 
   - code: "105.MSFT"
     symbol: "MSFT"
@@ -33,6 +36,7 @@ symbols:
     market: "us"
     name: "微软"
     fixed_size: 100
+    lot_size: 1  # min trading unit (CN=100, US=1)
 
 sentiment:
   threshold_long: 0.3        # 情绪分 >= 该值则开多
@@ -43,6 +47,12 @@ sentiment:
   llm_api_base: ""           # llm 后端用（OpenAI 兼容，留空读 OPENAI_BASE_URL）
   llm_api_key: ""            # 留空读 OPENAI_API_KEY
   llm_model: ""              # 留空读 OPENAI_MODEL，默认 gpt-4o-mini
+  allow_short: false          # allow short selling (off for A-share)
+  stop_loss_pct: 0.05         # initial stop loss (0=off)
+  take_profit_pct: 0.0        # take profit (0=off)
+  trailing_stop_pct: 0.0      # trailing stop (0=off)
+  risk_percent: 0.0           # risk per trade as % of capital (>0 overrides fixed_size)
+  max_position_pct: 0.95      # max position as % of capital
 
 backtest:
   start_date: "20240101"
@@ -65,7 +75,7 @@ monitor:
   themes_path: "news_aggregator/themes.yaml"
   top_constituents: 5            # 告警里展示每个板块前几只成分股
   board_cache_refresh_hours: 24  # 板块成分股缓存刷新周期
-  impact_min: 0.4               # 影响分告警阈值（只推高影响，避免刷屏/触发Server酱限流）
+  impact_min: 0.3               # 影响分告警阈值（只推高影响，避免刷屏/触发Server酱限流）
   # 推送开关（密钥留空则读取对应环境变量，见 push.py）
   push:
     wecom: true
@@ -102,5 +112,6 @@ impact:
     intensity: 0.25           # 情绪强度 |score|
     relevance: 0.20           # 持仓/关注相关度
     theme: 0.15               # 主题热度
+
 
 

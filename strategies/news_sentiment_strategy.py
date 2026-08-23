@@ -1,9 +1,13 @@
-"""新闻情绪驱动 CTA 策略（vnpy CtaTemplate）。
+"""新闻情绪驱动 CTA 策略（vnpy CtaTemplate）——强化版 v2。
 
-信号逻辑（只做多头，默认空仓）：
-- 当日新闻情绪分 >= threshold  -> 开多（固定股数）
-- 当日新闻情绪分 <= threshold_flat -> 平多
-情绪分由 scripts/sentiment_score.py 预计算，按日期写入 CSV。
+相对 v1 的增强：
+- 前视修复：用「上一交易日」的情绪分生成信号，避免使用当日尚未收盘的新闻（前视偏差）。
+- 风控出场：初始止损 / 止盈 / 移动止损（收盘价判断）。
+- 可选做空：allow_short=True 时，情绪分 <= -threshold 反向开空（A股普通账户不可融券，默认关）。
+- 风险预算仓位：risk_percent > 0 时按止损距离动态计算股数，并向下取整到 lot_size。
+
+情绪分由 scripts/sentiment_score.py 预计算，按日期写入 CSV（列：date, score）。
+仅用于学习研究，不构成投资建议。
 """
 
 import csv
@@ -30,39 +34,152 @@ def load_sentiment(path: str) -> dict:
 
 
 class NewsSentimentStrategy(CtaTemplate):
-    """"""
+    """新闻情绪驱动策略（多空可选 + 风控 + 风险仓位）。"""
 
     author: str = "FlashQuant"
 
-    threshold: float = 0.3
-    threshold_flat: float = -0.3
-    fixed_size: int = 100
+    # ---- 信号参数 ----
+    threshold: float = 0.3          # 开多阈值（做空为 -threshold）
+    threshold_flat: float = -0.3    # 平多阈值（做空平仓为 -threshold_flat）
+    allow_short: bool = False       # 是否允许做空（A股普通账户不可融券，默认关）
+
+    # ---- 仓位参数 ----
+    fixed_size: int = 100           # 固定股数（risk_percent=0 时生效）
+    risk_percent: float = 0.0       # 单笔风险占初始资金比例（>0 覆盖 fixed_size）
+    max_position_pct: float = 0.95  # 单标的仓位上限（占初始资金比例）
+    lot_size: int = 100             # 最小交易单位（A股=100，美股=1）
+    capital: float = 1_000_000.0    # 初始资金（用于风险仓位估算）
+
+    # ---- 出场 / 风控参数 ----
+    stop_loss_pct: float = 0.05     # 初始止损（0=关闭）
+    take_profit_pct: float = 0.0    # 止盈（0=关闭）
+    trailing_stop_pct: float = 0.0  # 移动止损（0=关闭）
+
     sentiment_path: str = ""
 
-    parameters: list = ["threshold", "threshold_flat", "fixed_size", "sentiment_path"]
-    variables: list = ["score"]
+    parameters: list = [
+        "threshold", "threshold_flat", "allow_short",
+        "fixed_size", "risk_percent", "max_position_pct", "lot_size", "capital",
+        "stop_loss_pct", "take_profit_pct", "trailing_stop_pct",
+        "sentiment_path",
+    ]
+    variables: list = ["score", "entry_price", "highest_price", "lowest_price"]
 
     def on_init(self) -> None:
-        """策略初始化：载入情绪数据。"""
         self.sentiment: dict = load_sentiment(self.sentiment_path)
         self.score: float = 0.0
+        self.entry_price: float = 0.0
+        self.highest_price: float = 0.0
+        self.lowest_price: float = 0.0
+        self._last_date = None
         self.write_log(f"载入情绪数据 {len(self.sentiment)} 天")
 
     def on_start(self) -> None:
-        self.write_log("策略启动（新闻情绪驱动，只做多头）")
+        self.write_log("策略启动（新闻情绪驱动 v2：风控+风险仓位+可选做空）")
 
     def on_stop(self) -> None:
         self.write_log("策略停止")
 
+    # ---------- 工具 ----------
+    def _calc_size(self, price: float) -> int:
+        """按风险预算计算开仓股数，并取整到 lot_size、受仓位上限约束。"""
+        if price <= 0:
+            return 0
+        if self.risk_percent > 0 and self.stop_loss_pct > 0:
+            risk_amount = self.capital * self.risk_percent
+            per_share_risk = price * self.stop_loss_pct
+            size = int(risk_amount / per_share_risk)
+        else:
+            size = int(self.fixed_size)
+        max_size = int(self.capital * self.max_position_pct / price)
+        size = min(size, max_size)
+        if self.lot_size > 1:
+            size = size // self.lot_size * self.lot_size
+        return max(0, size)
+
+    def _open_long(self, price: float) -> None:
+        size = self._calc_size(price)
+        if size <= 0:
+            return
+        self.buy(price, float(size))
+        self.entry_price = price
+        self.highest_price = price
+
+    def _open_short(self, price: float) -> None:
+        size = self._calc_size(price)
+        if size <= 0:
+            return
+        self.short(price, float(size))
+        self.entry_price = price
+        self.lowest_price = price
+
+    def _reset_position(self) -> None:
+        self.entry_price = 0.0
+        self.highest_price = 0.0
+        self.lowest_price = 0.0
+
+    def _check_exit(self, bar: BarData) -> bool:
+        """检查止损/止盈/移动止损，触发则平仓并返回 True（收盘价判断）。"""
+        price = bar.close_price
+        if self.pos > 0:
+            self.highest_price = max(self.highest_price, price)
+            stop = self.entry_price * (1.0 - self.stop_loss_pct) if self.stop_loss_pct > 0 else None
+            if self.trailing_stop_pct > 0:
+                trail = self.highest_price * (1.0 - self.trailing_stop_pct)
+                if stop is None or trail > stop:
+                    stop = trail
+            take = self.entry_price * (1.0 + self.take_profit_pct) if self.take_profit_pct > 0 else None
+            if stop is not None and price <= stop:
+                self.sell(price, abs(self.pos))
+                self._reset_position()
+                return True
+            if take is not None and price >= take:
+                self.sell(price, abs(self.pos))
+                self._reset_position()
+                return True
+        elif self.pos < 0:
+            self.lowest_price = min(self.lowest_price, price)
+            stop = self.entry_price * (1.0 + self.stop_loss_pct) if self.stop_loss_pct > 0 else None
+            if self.trailing_stop_pct > 0:
+                trail = self.lowest_price * (1.0 + self.trailing_stop_pct)
+                if stop is None or trail < stop:
+                    stop = trail
+            take = self.entry_price * (1.0 - self.take_profit_pct) if self.take_profit_pct > 0 else None
+            if stop is not None and price >= stop:
+                self.cover(price, abs(self.pos))
+                self._reset_position()
+                return True
+            if take is not None and price <= take:
+                self.cover(price, abs(self.pos))
+                self._reset_position()
+                return True
+        return False
+
     def on_bar(self, bar: BarData) -> None:
-        """逐日 K 线回调。"""
-        d: str = bar.datetime.strftime("%Y-%m-%d")
-        self.score = float(self.sentiment.get(d, 0.0))
+        """逐日 K 线回调：T-1 情绪 -> T 日交易（避免前视）。"""
+        # 1) 上一交易日情绪分
+        if self._last_date is not None:
+            self.score = float(self.sentiment.get(self._last_date, 0.0))
+        else:
+            self.score = 0.0
 
-        # 开多
-        if self.pos == 0 and self.score >= self.threshold:
-            self.buy(bar.close_price, float(self.fixed_size))
+        # 2) 已有持仓：先做风控出场
+        if self.pos != 0 and self._check_exit(bar):
+            self._last_date = bar.datetime.strftime("%Y-%m-%d")
+            return
 
-        # 平多
+        # 3) 空仓：按信号开仓
+        if self.pos == 0:
+            if self.score >= self.threshold:
+                self._open_long(bar.close_price)
+            elif self.allow_short and self.score <= -self.threshold:
+                self._open_short(bar.close_price)
+        # 4) 持仓中的情绪反转出场
         elif self.pos > 0 and self.score <= self.threshold_flat:
             self.sell(bar.close_price, abs(self.pos))
+            self._reset_position()
+        elif self.pos < 0 and self.score >= -self.threshold_flat:
+            self.cover(bar.close_price, abs(self.pos))
+            self._reset_position()
+
+        self._last_date = bar.datetime.strftime("%Y-%m-%d")
