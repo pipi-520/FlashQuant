@@ -551,3 +551,19 @@ def apply_primary_keys(primary: dict) -> None:
         v = str(primary.get(k) or "").strip()
         if v and not os.environ.get(env):
             os.environ[env] = v
+
+
+def load_env_file(env_path) -> None:
+    """Load KEY=VALUE lines from a .env file into os.environ (existing env wins)."""
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, _, v = line.partition("=")
+                k, v = k.strip(), v.strip()
+                if k and not os.environ.get(k):
+                    os.environ[k] = v
+    except FileNotFoundError:
+        pass

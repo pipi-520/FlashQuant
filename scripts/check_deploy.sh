@@ -28,6 +28,8 @@ sec "密钥配置"
 if [ -s "$APP_DIR/.env" ]; then
   grep -qE '^SERVERCHAN_SENDKEY=.+' "$APP_DIR/.env" 2>/dev/null \
     && ok ".env 已配置 Server酱" || bad ".env 缺少 SERVERCHAN_SENDKEY"
+  grep -qE '^WECOM_WEBHOOK=.+' "$APP_DIR/.env" 2>/dev/null \
+    && ok ".env 已配置企业微信" || echo "  [提示] .env 未配置 WECOM_WEBHOOK（企业微信推送不可用）"
 else
   bad "未找到 $APP_DIR/.env（复制 .env.example 填写）"
 fi

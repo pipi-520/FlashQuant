@@ -26,7 +26,7 @@ import yaml
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from news_aggregator.fetchers import SOURCES, filter_recent, apply_primary_keys  # noqa: E402
+from news_aggregator.fetchers import SOURCES, filter_recent, apply_primary_keys, load_env_file  # noqa: E402
 from news_aggregator.sentiment import score_text, configure_backend  # noqa: E402
 from news_aggregator.push import push_alert  # noqa: E402
 from news_aggregator.run import compute_daily, load_history, save_history, upsert_history  # noqa: E402
@@ -267,6 +267,7 @@ def main() -> int:
     ap.add_argument("--no-boards", action="store_true", help="跳过板块缓存构建")
     args = ap.parse_args()
 
+    load_env_file(ROOT / ".env")
     cfg = load_config()
     apply_primary_keys(cfg.get("primary") or {})
     configure_backend(cfg)

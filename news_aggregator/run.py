@@ -21,7 +21,7 @@ import yaml
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from news_aggregator.fetchers import SOURCES, fetch_symbol_news, filter_recent, apply_primary_keys  # noqa: E402
+from news_aggregator.fetchers import SOURCES, fetch_symbol_news, filter_recent, apply_primary_keys, load_env_file  # noqa: E402
 from news_aggregator.sentiment import score_text, configure_backend  # noqa: E402
 from news_aggregator.tagger import tag  # noqa: E402
 from news_aggregator.push import push_alert  # noqa: E402
@@ -217,6 +217,7 @@ def main() -> int:
         print(f"[history] 已重建: 市场 {n_mkt} 天 / 个股 {n_sym} 只 -> {HISTORY_PATH}")
         return 0
 
+    load_env_file(ROOT / ".env")
     cfg = load_config()
     apply_primary_keys(cfg.get("primary") or {})
     configure_backend(cfg)
