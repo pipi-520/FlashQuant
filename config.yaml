@@ -52,7 +52,15 @@ sentiment:
   take_profit_pct: 0.0        # take profit (0=off)
   trailing_stop_pct: 0.0      # trailing stop (0=off)
   risk_percent: 0.0           # risk per trade as % of capital (>0 overrides fixed_size)
-  max_position_pct: 0.95      # max position as % of capital
+  max_position_pct: 0.95
+
+summary:
+  enabled: true            # 是否用 LLM 生成日报综述（失败自动回退纯数据日报）
+  top_n: 100               # 取影响分最高的 N 条新闻喂给 LLM
+  api_base: ""             # 留空读 OPENAI_BASE_URL
+  api_key: ""              # 留空读 OPENAI_API_KEY
+  model: ""                # 留空读 OPENAI_MODEL，默认 gpt-4o-mini
+      # max position as % of capital
 
 backtest:
   start_date: "20240101"

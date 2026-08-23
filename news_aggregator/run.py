@@ -12,6 +12,7 @@
 
 import argparse
 import json
+import os
 import pathlib
 import sys
 from datetime import date, datetime
@@ -145,13 +146,88 @@ def rebuild_history_from_raw() -> dict:
     return h
 
 
-def build_report(day: str, items, stats, market, sym_out) -> str:
+def build_llm_summary(items, cfg):
+    """用 LLM 对 Top N 高影响事件生成日报综述；失败返回 None（回退纯数据日报）。"""
+    summ = (cfg.get("summary") or {})
+    if not summ.get("enabled", False):
+        return None
+    top_n = int(summ.get("top_n", 100) or 100)
+    ranked = sorted(items, key=lambda x: float(x.get("impact") or 0.0), reverse=True)[:top_n]
+    if not ranked:
+        return None
+
+    api_base = (str(summ.get("api_base") or "") or os.environ.get("OPENAI_BASE_URL")
+                or "https://api.openai.com/v1").rstrip("/")
+    api_key = str(summ.get("api_key") or "") or os.environ.get("OPENAI_API_KEY", "")
+    model = str(summ.get("model") or "") or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    if not api_key:
+        print("[summary] 未配置 LLM key，跳过综述（回退纯数据日报）")
+        return None
+
+    news_lines = []
+    for i, it in enumerate(ranked, 1):
+        title = (it.get("title") or "").strip()
+        content = (it.get("content") or "").strip()
+        text = (title + " — " + content) if content else title
+        text = text.replace("\n", " ")[:160]
+        imp = float(it.get("impact") or 0.0)
+        sc = float(it.get("sentiment") or 0.0)
+        src = it.get("source") or ""
+        syms = ",".join(it.get("symbols") or [])
+        line = f"{i}. [{imp:.2f}|情绪{sc:+.2f}|{src}] {text}"
+        if syms:
+            line += f"（相关：{syms}）"
+        news_lines.append(line)
+    news_text = "\n".join(news_lines)
+
+    prompt = (
+        "你是资深财经分析师。下面是今天按影响分排序的高影响新闻"
+        "（格式：编号. [影响分|情绪|来源] 标题 — 摘要（相关标的））。\n"
+        "请用中文写一段 400~600 字的「今日财经要闻综述」，要求：\n"
+        "1. 先用一句话概括今日市场情绪基调；\n"
+        "2. 提炼 3~5 个最重要主题，说明影响方向与涉及板块/个股；\n"
+        "3. 最后给 2~3 条次日值得关注的风险点或机会点。\n"
+        "只输出综述正文，不要标题、不要用 markdown 列表符号。\n\n"
+        f"今日新闻（{len(ranked)} 条）：\n{news_text}"
+    )
+
+    try:
+        import requests  # noqa: E402
+        r = requests.post(
+            f"{api_base}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=60,
+        )
+        data = r.json()
+        if "choices" not in data or not data["choices"]:
+            print(f"[summary] LLM 返回异常: {str(data)[:200]}")
+            return None
+        summary = str(data["choices"][0]["message"]["content"] or "").strip()
+        if not summary:
+            return None
+        print(f"[summary] 综述生成成功（{len(summary)} 字）")
+        return summary
+    except Exception as e:  # noqa: BLE001
+        print(f"[summary] LLM 综述失败，回退纯数据日报: {e}")
+        return None
+
+
+def build_report(day: str, items, stats, market, sym_out, summary=None) -> str:
     lines = []
     lines.append(f"# 财经新闻舆情日报 {day}")
     lines.append("")
     lines.append(f"> 生成时间：{datetime.now():%Y-%m-%d %H:%M:%S}")
     lines.append("> 数据来源：多源快讯 + 英文一手源（按影响分排序）")
     lines.append("")
+    if summary:
+        lines.append("## 今日综述（LLM）")
+        lines.append("")
+        lines.append(summary)
+        lines.append("")
     lines.append("## 数据源统计")
     lines.append("")
     lines.append("| 来源 | 条数 |")
@@ -277,7 +353,8 @@ def main() -> int:
     print(f"[history] 累积历史 -> {HISTORY_PATH}"
           f"（市场 {len(history.get('market', {}))} 天 / 个股 {len(history.get('symbols', {}))} 只）")
 
-    md = build_report(args.date, items, stats, market, sym_out)
+    summary = build_llm_summary(items, cfg)
+    md = build_report(args.date, items, stats, market, sym_out, summary)
     report_path = report_dir / f"{args.date}.md"
     report_path.write_text(md, encoding="utf-8")
     print(f"[agg] raw -> {raw_path}")
