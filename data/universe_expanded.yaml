@@ -1,0 +1,59 @@
+# 扩展标的池：用于消除幸存者偏差的统计检验。
+#
+# 纳入规则（透明、非手工挑选"大牛股"）：
+#   - A股：沪深300 代表性成分股，按行业分层抽样（银行/保险/消费/医药/科技/
+#     新能源/地产/工业/能源/家电/通信），含 2024-2026 期间明显下跌的标的
+#     （万科A、隆基绿能、牧原股份等），避免只挑表现好的股票。
+#   - 美股：标普500 代表性成分股，覆盖科技/金融/能源/医药/消费，
+#     含下跌代表（PFE、KO、JNJ 等 2024-2026 表现平淡/下跌的标的）。
+#   - 原 4 只标的（600519/000858/AAPL/MSFT）包含在池内，作为「原组合」对照对象。
+#
+# 字段与 config.yaml 的 symbols 一致。仅由 scripts/universe_expansion.py 使用，
+# 不改动 config.yaml 的默认回测标的。
+
+symbols:
+  # ===== A股（30 只，沪深300 行业分层）=====
+  - {code: "600519", symbol: "600519", exchange: "SSE",  market: "cn", name: "贵州茅台", fixed_size: 100, lot_size: 100}
+  - {code: "000858", symbol: "000858", exchange: "SZSE", market: "cn", name: "五粮液",   fixed_size: 100, lot_size: 100}
+  - {code: "600036", symbol: "600036", exchange: "SSE",  market: "cn", name: "招商银行", fixed_size: 100, lot_size: 100}
+  - {code: "601398", symbol: "601398", exchange: "SSE",  market: "cn", name: "工商银行", fixed_size: 100, lot_size: 100}
+  - {code: "000001", symbol: "000001", exchange: "SZSE", market: "cn", name: "平安银行", fixed_size: 100, lot_size: 100}
+  - {code: "601318", symbol: "601318", exchange: "SSE",  market: "cn", name: "中国平安", fixed_size: 100, lot_size: 100}
+  - {code: "600030", symbol: "600030", exchange: "SSE",  market: "cn", name: "中信证券", fixed_size: 100, lot_size: 100}
+  - {code: "600887", symbol: "600887", exchange: "SSE",  market: "cn", name: "伊利股份", fixed_size: 100, lot_size: 100}
+  - {code: "603288", symbol: "603288", exchange: "SSE",  market: "cn", name: "海天味业", fixed_size: 100, lot_size: 100}
+  - {code: "002714", symbol: "002714", exchange: "SZSE", market: "cn", name: "牧原股份", fixed_size: 100, lot_size: 100}
+  - {code: "600276", symbol: "600276", exchange: "SSE",  market: "cn", name: "恒瑞医药", fixed_size: 100, lot_size: 100}
+  - {code: "300760", symbol: "300760", exchange: "SZSE", market: "cn", name: "迈瑞医疗", fixed_size: 100, lot_size: 100}
+  - {code: "603259", symbol: "603259", exchange: "SSE",  market: "cn", name: "药明康德", fixed_size: 100, lot_size: 100}
+  - {code: "000538", symbol: "000538", exchange: "SZSE", market: "cn", name: "云南白药", fixed_size: 100, lot_size: 100}
+  - {code: "002415", symbol: "002415", exchange: "SZSE", market: "cn", name: "海康威视", fixed_size: 100, lot_size: 100}
+  - {code: "000725", symbol: "000725", exchange: "SZSE", market: "cn", name: "京东方A",  fixed_size: 100, lot_size: 100}
+  - {code: "002230", symbol: "002230", exchange: "SZSE", market: "cn", name: "科大讯飞", fixed_size: 100, lot_size: 100}
+  - {code: "603986", symbol: "603986", exchange: "SSE",  market: "cn", name: "兆易创新", fixed_size: 100, lot_size: 100}
+  - {code: "300750", symbol: "300750", exchange: "SZSE", market: "cn", name: "宁德时代", fixed_size: 100, lot_size: 100}
+  - {code: "601012", symbol: "601012", exchange: "SSE",  market: "cn", name: "隆基绿能", fixed_size: 100, lot_size: 100}
+  - {code: "002594", symbol: "002594", exchange: "SZSE", market: "cn", name: "比亚迪",   fixed_size: 100, lot_size: 100}
+  - {code: "000002", symbol: "000002", exchange: "SZSE", market: "cn", name: "万科A",    fixed_size: 100, lot_size: 100}
+  - {code: "600048", symbol: "600048", exchange: "SSE",  market: "cn", name: "保利发展", fixed_size: 100, lot_size: 100}
+  - {code: "601668", symbol: "601668", exchange: "SSE",  market: "cn", name: "中国建筑", fixed_size: 100, lot_size: 100}
+  - {code: "600031", symbol: "600031", exchange: "SSE",  market: "cn", name: "三一重工", fixed_size: 100, lot_size: 100}
+  - {code: "601857", symbol: "601857", exchange: "SSE",  market: "cn", name: "中国石油", fixed_size: 100, lot_size: 100}
+  - {code: "600900", symbol: "600900", exchange: "SSE",  market: "cn", name: "长江电力", fixed_size: 100, lot_size: 100}
+  - {code: "000333", symbol: "000333", exchange: "SZSE", market: "cn", name: "美的集团", fixed_size: 100, lot_size: 100}
+  - {code: "600690", symbol: "600690", exchange: "SSE",  market: "cn", name: "海尔智家", fixed_size: 100, lot_size: 100}
+  - {code: "600941", symbol: "600941", exchange: "SSE",  market: "cn", name: "中国移动", fixed_size: 100, lot_size: 100}
+
+  # ===== 美股（12 只，标普500 行业分层）=====
+  - {code: "105.AAPL",  symbol: "AAPL",  exchange: "NASDAQ", market: "us", name: "苹果",   fixed_size: 100, lot_size: 1}
+  - {code: "105.MSFT",  symbol: "MSFT",  exchange: "NASDAQ", market: "us", name: "微软",   fixed_size: 100, lot_size: 1}
+  - {code: "105.NVDA",  symbol: "NVDA",  exchange: "NASDAQ", market: "us", name: "英伟达", fixed_size: 100, lot_size: 1}
+  - {code: "105.GOOGL", symbol: "GOOGL", exchange: "NASDAQ", market: "us", name: "谷歌",   fixed_size: 100, lot_size: 1}
+  - {code: "105.AMZN",  symbol: "AMZN",  exchange: "NASDAQ", market: "us", name: "亚马逊", fixed_size: 100, lot_size: 1}
+  - {code: "105.META",  symbol: "META",  exchange: "NASDAQ", market: "us", name: "Meta",   fixed_size: 100, lot_size: 1}
+  - {code: "105.TSLA",  symbol: "TSLA",  exchange: "NASDAQ", market: "us", name: "特斯拉", fixed_size: 100, lot_size: 1}
+  - {code: "106.JPM",   symbol: "JPM",   exchange: "NYSE",   market: "us", name: "摩根大通", fixed_size: 100, lot_size: 1}
+  - {code: "106.XOM",   symbol: "XOM",   exchange: "NYSE",   market: "us", name: "埃克森美孚", fixed_size: 100, lot_size: 1}
+  - {code: "106.JNJ",   symbol: "JNJ",   exchange: "NYSE",   market: "us", name: "强生",   fixed_size: 100, lot_size: 1}
+  - {code: "106.KO",    symbol: "KO",    exchange: "NYSE",   market: "us", name: "可口可乐", fixed_size: 100, lot_size: 1}
+  - {code: "106.PFE",   symbol: "PFE",   exchange: "NYSE",   market: "us", name: "辉瑞",   fixed_size: 100, lot_size: 1}

@@ -11,5 +11,11 @@ news/boards_cache.json
 .env
 .env.*
 *.local
+# 日志 / 安装器 / 临时目录（本地运行产物，不提交）
+*.log
+get-pip.py
+logs/
+.tmp/
+tmp*/
 
 !.env.example

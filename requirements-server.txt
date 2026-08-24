@@ -1,8 +1,9 @@
 # 云端常驻服务（monitor.py）最小依赖。
 # 与 requirements.txt 的区别：不含 vnpy/yfinance 等回测用重型库，
 # 云服务器部署更快、占用更小。回测请在本地用 requirements.txt。
-akshare
-pandas
-numpy
-pyyaml
-requests
+# 版本为当前验证环境的锁定值。
+akshare==1.18.92
+pandas==3.0.5
+numpy==2.5.2
+pyyaml==6.0.3
+requests==2.34.2

@@ -297,7 +297,11 @@ def fetch_fred():
             continue
     return items
 def fetch_northbound():
-    """沪深港通北向资金（akshare，best-effort）。"""
+    """沪深港通北向资金（akshare，best-effort）。
+
+    时间戳用数据里的交易日而非抓取时刻：否则每轮轮询都会生成新 id，
+    导致 monitor 的去重失效、raw 归档无限重复追加。
+    """
     import akshare as ak
     try:
         df = ak.stock_hsgt_fund_flow_summary_em()
@@ -306,8 +310,16 @@ def fetch_northbound():
         row = df.iloc[0]
         cols = {c: str(c) for c in df.columns}
         text = " | ".join(f"{k}: {row[k]}" for k in df.columns[:6])
-        now = datetime.now(TZ)
-        obj = _mk(now, "北向资金", "沪深港通资金流", text, "", lang="zh")
+        dt = None
+        for k in ("交易日", "日期", "date", "Date"):
+            if k in cols:
+                dt = _parse_dt(str(row[k]))
+                if dt is not None:
+                    break
+        if dt is None:
+            # 兜底：抓取当日 15:00（收盘后），至少保证同一交易日内 id 稳定
+            dt = datetime.now(TZ).replace(hour=15, minute=0, second=0, microsecond=0)
+        obj = _mk(dt, "北向资金", "沪深港通资金流", text, "", lang="zh")
         return [obj] if obj else []
     except Exception:  # noqa: BLE001
         return []
@@ -373,7 +385,8 @@ def fetch_sina():
     if df is not None and not df.empty:
         for _, r in df.iterrows():
             dt = _parse_dt(r.get("时间", ""))
-            it = _mk(dt, "新浪7x24", r.get("内容", ""), r.get("内容", ""), "")
+            # 新浪快讯无标题：正文只放 content，避免 title==content 导致情绪/关键词/体积翻倍
+            it = _mk(dt, "新浪7x24", "", r.get("内容", ""), "")
             if it:
                 items.append(it)
     return items
@@ -546,6 +559,7 @@ def apply_primary_keys(primary: dict) -> None:
         "bargo_base_url": "BARGO_BASE_URL",
         "bargo_api_key": "BARGO_API_KEY",
         "fred_api_key": "FRED_API_KEY",
+        "finnhub_api_key": "FINNHUB_API_KEY",
     }
     for k, env in mapping.items():
         v = str(primary.get(k) or "").strip()

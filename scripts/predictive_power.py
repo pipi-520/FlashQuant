@@ -95,12 +95,12 @@ def normalize_index(df) -> pd.DataFrame:
     return out.sort_values("date").reset_index(drop=True)
 
 
-def fetch_board_index(name: str, kind: str) -> pd.DataFrame:
+def fetch_board_index(name: str, kind: str, start: str, end: str) -> pd.DataFrame:
     import akshare as ak
     if kind == "concept":
-        df = ak.stock_board_concept_index_ths(symbol=name, start_date=START, end_date=END)
+        df = ak.stock_board_concept_index_ths(symbol=name, start_date=start, end_date=end)
     else:
-        df = ak.stock_board_industry_index_ths(symbol=name, start_date=START, end_date=END)
+        df = ak.stock_board_industry_index_ths(symbol=name, start_date=start, end_date=end)
     return normalize_index(df)
 
 
@@ -150,13 +150,13 @@ def save_cache(cache: dict) -> None:
     CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
 
 
-def board_daily(name: str, kind: str, cache: dict, use_cache: bool) -> dict | None:
+def board_daily(name: str, kind: str, cache: dict, use_cache: bool, start: str, end: str) -> dict | None:
     """返回 {date_str: close} 或 None。带缓存。"""
     key = f"{kind}:{name}"
     if use_cache and key in cache and cache[key].get("dates"):
         return cache[key]
     try:
-        df = fetch_board_index(name, kind)
+        df = fetch_board_index(name, kind, start, end)
     except Exception as e:  # noqa: BLE001
         print(f"  [skip] {name}({kind}) 获取失败: {type(e).__name__}")
         return None
@@ -194,6 +194,8 @@ def main() -> int:
     ap.add_argument("--impact-min", type=float, default=0.0, help="只统计影响分>=该值的命中")
     ap.add_argument("--max-boards", type=int, default=3, help="每个主题最多取几个板块")
     ap.add_argument("--no-cache", action="store_true", help="忽略板块缓存强制重取")
+    ap.add_argument("--start", default=START, help="板块指数起始日 YYYYMMDD")
+    ap.add_argument("--end", default=END, help="板块指数结束日 YYYYMMDD")
     args = ap.parse_args()
 
     themes = load_themes()
@@ -223,7 +225,7 @@ def main() -> int:
         for name, kind in theme_boards.get(th["name"], []):
             if (name, kind) in all_daily:
                 continue
-            rec = board_daily(name, kind, cache, use_cache)
+            rec = board_daily(name, kind, cache, use_cache, args.start, args.end)
             if rec:
                 all_daily[(name, kind)] = rec
             sys.stdout.write(".")

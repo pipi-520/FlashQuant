@@ -91,14 +91,41 @@ def build_board_cache(theme_names: dict, top_n: int = 5) -> tuple[dict, dict]:
     返回 (boards, theme_boards)：
       boards:       {板块名: {kind, constituents}}
       theme_boards: {主题name: [板块名,...]}
+
+    全量板块名在进程内只拉一次（旧实现对每个主题重复请求全量接口，
+    接口慢/失败时构建时间随主题数线性膨胀）。
     """
+    try:
+        cnames = fetch_board_names("concept")
+    except Exception as e:  # noqa: BLE001
+        print(f"[boards] 获取concept板块名失败: {type(e).__name__}")
+        cnames = []
+    try:
+        inames = fetch_board_names("industry")
+    except Exception as e:  # noqa: BLE001
+        print(f"[boards] 获取industry板块名失败: {type(e).__name__}")
+        inames = []
+
+    def resolve(patterns: list, names: list) -> list:
+        out = []
+        for pat in patterns:
+            pl = str(pat).lower()
+            out.extend(n for n in names if pl in n.lower())
+        seen, res = set(), []
+        for n in out:
+            if n not in seen:
+                seen.add(n)
+                res.append(n)
+        return res
+
     boards = {}
     theme_boards = {}
     for tname, t in theme_names.items():
         resolved = []
         for kind_key in ("concept_boards", "industry_boards"):
             kind = "concept" if kind_key == "concept_boards" else "industry"
-            for b in resolve_boards(t.get(kind_key) or [], kind):
+            names = cnames if kind == "concept" else inames
+            for b in resolve(t.get(kind_key) or [], names):
                 resolved.append(b)
                 if b in boards:
                     continue
@@ -131,7 +158,10 @@ def save_cached(cache: dict) -> None:
 
 
 def get_board_cache(theme_names: dict, top_n: int = 5, refresh_hours: int = 24) -> tuple[dict, dict]:
-    """带过期判断的板块缓存。失败返回 ({}, {})。"""
+    """带过期判断的板块缓存。失败返回 ({}, {})，且不缓存失败结果。
+
+    旧实现失败时也把空结果缓存 24h，导致网络恢复前一直拿不到板块数据。
+    """
     cached = load_cached()
     if cached and cached.get("ts"):
         age_h = (time.time() - cached["ts"]) / 3600
@@ -144,6 +174,7 @@ def get_board_cache(theme_names: dict, top_n: int = 5, refresh_hours: int = 24) 
         boards, theme_boards = build_board_cache(theme_names, top_n)
     except Exception as e:  # noqa: BLE001
         print(f"[boards] 板块缓存构建失败: {type(e).__name__}")
-        boards, theme_boards = {}, {}
-    save_cached({"ts": time.time(), "boards": boards, "theme_boards": theme_boards})
+        return {}, {}
+    if boards or theme_boards:
+        save_cached({"ts": time.time(), "boards": boards, "theme_boards": theme_boards})
     return boards, theme_boards

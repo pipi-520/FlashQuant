@@ -1,8 +1,10 @@
 [Unit]
-Description=Run chaogu daily aggregation on weekdays 18:30 (server local time)
+Description=Run chaogu daily aggregation on weekdays 18:30 (Beijing time)
 
 [Timer]
 OnCalendar=Mon..Fri 18:30
+# 固定北京时间，避免服务器时区非 UTC+8 时与 GitHub Actions 的 18:30 漂移
+Timezone=Asia/Shanghai
 Persistent=true
 
 [Install]

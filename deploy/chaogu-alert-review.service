@@ -1,0 +1,9 @@
+[Unit]
+Description=FlashQuant alert review (daily, after market close)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/chaogu
+EnvironmentFile=/opt/chaogu/.env
+ExecStart=/opt/chaogu/.venv/bin/python /opt/chaogu/scripts/alert_review.py --push

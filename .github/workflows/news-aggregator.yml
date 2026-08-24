@@ -20,7 +20,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install akshare pandas requests pyyaml
+        run: pip install -r requirements-server.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest tests -q
 
       - name: Run aggregator
         run: python news_aggregator/run.py --push

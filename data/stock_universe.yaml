@@ -1,0 +1,119 @@
+# 核心股票池（供「新闻 -> 个股影响映射」使用）。
+# 每只股票给一句「主营/概念」描述，LLM 据此判断一条新闻利好/利空哪些股票。
+# 可按需增删，格式：name / code / business。
+
+stocks:
+  # ---- 医药 / 疫苗（创新药主题）----
+  - name: 恒瑞医药
+    code: "600276"
+    business: 创新药龙头，抗肿瘤药管线丰富
+  - name: 药明康德
+    code: "603259"
+    business: CXO/CRO 龙头，医药研发外包
+  - name: 智飞生物
+    code: "300122"
+    business: 疫苗龙头，代理HPV疫苗，自研结核疫苗
+  - name: 沃森生物
+    code: "300142"
+    business: 疫苗企业，布局mRNA疫苗
+  - name: 复星医药
+    code: "600196"
+    business: 创新药+疫苗，引进mRNA新冠疫苗
+  - name: 康希诺
+    code: "688185"
+    business: 疫苗企业，腺病毒载体/mRNA平台
+  - name: 百济神州
+    code: "688235"
+    business: 创新药，肿瘤药全球化
+  - name: 君实生物
+    code: "688180"
+    business: 创新药，PD-1及抗肿瘤管线
+  - name: 康泰生物
+    code: "300601"
+    business: 疫苗企业，多联疫苗
+  - name: 长春高新
+    code: "000661"
+    business: 生长激素龙头，生物制品
+  - name: 华兰生物
+    code: "002007"
+    business: 血制品+疫苗
+  - name: 泰格医药
+    code: "300347"
+    business: 临床CRO龙头
+
+  # ---- 半导体 / 芯片 ----
+  - name: 中芯国际
+    code: "688981"
+    business: 晶圆代工龙头
+  - name: 北方华创
+    code: "002371"
+    business: 半导体设备龙头
+  - name: 韦尔股份
+    code: "603501"
+    business: CIS图像传感器芯片
+  - name: 中微公司
+    code: "688012"
+    business: 刻蚀设备
+  - name: 澜起科技
+    code: "688008"
+    business: 内存接口芯片
+
+  # ---- AI / 算力 ----
+  - name: 科大讯飞
+    code: "002230"
+    business: 语音AI、大模型
+  - name: 中际旭创
+    code: "300308"
+    business: 光模块，算力网络
+  - name: 浪潮信息
+    code: "000977"
+    business: AI服务器
+  - name: 寒武纪
+    code: "688256"
+    business: AI芯片
+
+  # ---- 新能源 / 锂电 / 光伏 ----
+  - name: 宁德时代
+    code: "300750"
+    business: 动力电池龙头
+  - name: 隆基绿能
+    code: "601012"
+    business: 光伏硅片组件龙头
+  - name: 阳光电源
+    code: "300274"
+    business: 光伏逆变器+储能
+  - name: 亿纬锂能
+    code: "300014"
+    business: 锂电池
+
+  # ---- 券商 / 金融 ----
+  - name: 东方财富
+    code: "300059"
+    business: 互联网券商+基金代销
+  - name: 中信证券
+    code: "600030"
+    business: 券商龙头
+
+  # ---- 消费 / 白酒 ----
+  - name: 贵州茅台
+    code: "600519"
+    business: 白酒龙头
+  - name: 五粮液
+    code: "000858"
+    business: 白酒龙头
+
+  # ---- 军工 ----
+  - name: 中航沈飞
+    code: "600760"
+    business: 战斗机整机
+  - name: 航发动力
+    code: "600893"
+    business: 航空发动机
+
+  # ---- 机器人 ----
+  - name: 汇川技术
+    code: "300124"
+    business: 工控、伺服、机器人部件
+  - name: 绿的谐波
+    code: "688017"
+    business: 谐波减速器

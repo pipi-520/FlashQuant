@@ -1,12 +1,14 @@
-vnpy
-vnpy_ctastrategy
-vnpy_ctabacktester
-vnpy_paperaccount
-vnpy_sqlite
-vnpy_datamanager
-akshare
-pandas
-numpy
-pyyaml
-yfinance
-requests
+# 完整依赖（本地回测 + 聚合器）。版本为当前验证环境的锁定值，
+# 保证回测结果可复现；升级前请重跑 scripts/backtest.py 对比。
+vnpy==4.4.0
+vnpy_ctastrategy==1.4.1
+vnpy_ctabacktester==1.3.0
+vnpy_paperaccount==1.0.6
+vnpy_sqlite==1.1.3
+vnpy_datamanager==1.2.0
+akshare==1.18.92
+pandas==3.0.5
+numpy==2.5.2
+pyyaml==6.0.3
+yfinance==1.6.0
+requests==2.34.2

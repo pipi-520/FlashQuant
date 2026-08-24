@@ -78,7 +78,39 @@ def dedupe(items):
     return out
 
 
+def append_items_by_date(items: list, raw_dir: pathlib.Path) -> None:
+    """按新闻自身日期分组归档到 {raw_dir}/{YYYYMMDD}.jsonl（幂等：跳过文件里已存在的 id）。
+
+    run.py 与 monitor.py 共用此函数，保证归档规则一致：
+    - 按新闻日期归档（而非运行日期），避免同一 id 跨文件重复、文件膨胀；
+    - 追加写 + 文件内 id 去重，重复运行安全。
+    """
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    by_day: dict = {}
+    for it in items:
+        d = str(it.get("date") or "unknown").replace("-", "")
+        by_day.setdefault(d, []).append(it)
+    for day, lst in by_day.items():
+        path = raw_dir / f"{day}.jsonl"
+        existing = set()
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    existing.add(json.loads(line).get("id"))
+                except json.JSONDecodeError:
+                    continue
+        with open(path, "a", encoding="utf-8") as f:
+            for it in lst:
+                if it.get("id") in existing:
+                    continue
+                f.write(json.dumps(it, ensure_ascii=False) + "\n")
+
+
 def compute_daily(items):
+    """按日期聚合情绪均值。优先复用 item 里已算好的 sentiment（避免重复打分/LLM 成本）。"""
     market = {}
     per_sym = {}
     for it in items:
@@ -86,7 +118,13 @@ def compute_daily(items):
         if it.get("kind") != "news":
             continue
         d = it["date"]
-        sc = score_text(f"{it.get('title', '')} {it.get('content', '')}")
+        sc = it.get("sentiment")
+        if sc is None:
+            sc = score_text(f"{it.get('title', '')} {it.get('content', '')}")
+        try:
+            sc = float(sc)
+        except (TypeError, ValueError):
+            sc = 0.0
         market.setdefault(d, []).append(sc)
         for s in it.get("symbols", []):
             per_sym.setdefault(s, {}).setdefault(d, []).append(sc)
@@ -100,15 +138,20 @@ def compute_daily(items):
 
 def load_history() -> dict:
     if HISTORY_PATH.exists():
-        with open(HISTORY_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            print(f"[history] {HISTORY_PATH} 损坏，从空历史重建")
     return {"market": {}, "symbols": {}}
 
 
 def save_history(h: dict) -> None:
     NEWS_DIR.mkdir(exist_ok=True)
-    with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+    tmp = HISTORY_PATH.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(h, f, ensure_ascii=False, indent=2)
+    tmp.replace(HISTORY_PATH)  # 原子替换，避免写入中断损坏历史文件
 
 
 def upsert_history(h: dict, market: dict, sym_out: dict) -> dict:
@@ -271,7 +314,10 @@ def build_report(day: str, items, stats, market, sym_out, summary=None) -> str:
         text = (it.get("title") or it.get("content") or "").strip()
         text = text[:60].replace("|", "\\|") + ("…" if len(text) > 60 else "")
         imp = it.get("impact", 0.0)
-        sc = it.get("sentiment", score_text(f"{it.get('title', '')} {it.get('content', '')}"))
+        # 影响分阶段已写入 sentiment 字段，直接复用（get 默认值会被急切求值，llm 后端会重复计费）
+        sc = it.get("sentiment")
+        if sc is None:
+            sc = score_text(f"{it.get('title', '')} {it.get('content', '')}")
         lines.append(f"| {imp:.3f} | {sc:+.2f} | {it.get('source')} | {text} |")
     lines.append("")
     return "\n".join(lines)
@@ -330,10 +376,9 @@ def main() -> int:
     raw_dir.mkdir(exist_ok=True)
     report_dir.mkdir(exist_ok=True)
 
-    raw_path = raw_dir / f"{args.date}.jsonl"
-    with open(raw_path, "w", encoding="utf-8") as f:
-        for it in items:
-            f.write(json.dumps(it, ensure_ascii=False) + "\n")
+    # 按新闻日期归档（而非运行日期），避免最近 30 天条目在每个运行日文件中重复写入
+    append_items_by_date(items, raw_dir)
+    print(f"[agg] raw -> {raw_dir}（按新闻日期归档 {len(items)} 条）")
 
     market, sym_out = compute_daily(items)
     daily = {
@@ -357,7 +402,7 @@ def main() -> int:
     md = build_report(args.date, items, stats, market, sym_out, summary)
     report_path = report_dir / f"{args.date}.md"
     report_path.write_text(md, encoding="utf-8")
-    print(f"[agg] raw -> {raw_path}")
+    print(f"[agg] raw 已按新闻日期归档到 {raw_dir}")
     print(f"[agg] report -> {report_path}")
     print(f"[agg] daily_sentiment -> {NEWS_DIR / 'daily_sentiment.json'}")
 

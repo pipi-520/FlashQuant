@@ -8,5 +8,14 @@ services:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       NTFY_TOPIC: ${NTFY_TOPIC:-}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      QUIVER_TOKEN: ${QUIVER_TOKEN:-}
+      BARGO_BASE_URL: ${BARGO_BASE_URL:-}
+      BARGO_API_KEY: ${BARGO_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
     volumes:
       - ./news:/app/news
+      - ./data:/app/data

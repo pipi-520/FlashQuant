@@ -103,8 +103,13 @@ python scripts/download_data.py       # 下载行情
 python scripts/sentiment_score.py     # 生成情绪分
 python scripts/backtest.py            # vnpy 回测 -> results/
 python scripts/paper_trade.py         # 本地模拟盘
+python scripts/paper_trade.py --reversal   # 反转因子模拟盘（42 只池，随机对照 p=0.025）
 python scripts/predictive_power.py    # 事件预测力回看
 ```
+
+> 研究结论速览（详见 `results/` 下的三份报告）：
+> 词典情绪分与事件信号在日频层面均未通过随机对照检验；**短期反转因子显著**（p=0.025），
+> 但对执行成本敏感（散户级佣金+滑点下净收益趋零）。
 
 ## 📂 项目结构
 

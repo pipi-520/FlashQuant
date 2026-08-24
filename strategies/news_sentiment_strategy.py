@@ -33,6 +33,28 @@ def load_sentiment(path: str) -> dict:
     return result
 
 
+def calc_size(price: float, fixed_size: int, risk_percent: float, stop_loss_pct: float,
+              max_position_pct: float, lot_size: int, capital: float) -> int:
+    """按风险预算计算开仓股数，取整到 lot_size、受仓位上限约束。
+
+    回测策略（vnpy）与本地模拟盘（scripts/paper_trade.py）共用此函数，
+    保证两处仓位计算完全一致（单一来源，避免漂移）。
+    """
+    if price <= 0:
+        return 0
+    if risk_percent > 0 and stop_loss_pct > 0:
+        risk_amount = capital * risk_percent
+        per_share_risk = price * stop_loss_pct
+        size = int(risk_amount / per_share_risk)
+    else:
+        size = int(fixed_size)
+    max_size = int(capital * max_position_pct / price)
+    size = min(size, max_size)
+    if lot_size > 1:
+        size = size // lot_size * lot_size
+    return max(0, size)
+
+
 class NewsSentimentStrategy(CtaTemplate):
     """新闻情绪驱动策略（多空可选 + 风控 + 风险仓位）。"""
 
@@ -63,7 +85,7 @@ class NewsSentimentStrategy(CtaTemplate):
         "stop_loss_pct", "take_profit_pct", "trailing_stop_pct",
         "sentiment_path",
     ]
-    variables: list = ["score", "entry_price", "highest_price", "lowest_price"]
+    variables: list = ["score", "entry_price", "highest_price", "lowest_price", "_last_date"]
 
     def on_init(self) -> None:
         self.sentiment: dict = load_sentiment(self.sentiment_path)
@@ -75,6 +97,14 @@ class NewsSentimentStrategy(CtaTemplate):
         self.write_log(f"载入情绪数据 {len(self.sentiment)} 天")
 
     def on_start(self) -> None:
+        # vnpy 在 on_init 之后才从 strategy_data 恢复 variables，
+        # 因此状态一致性检查放在 on_start（此时 pos/entry_price 已恢复）：
+        # 空仓却残留入场价时，止损/移动止损会基于失效价格判断，必须清理。
+        if self.pos == 0 and self.entry_price > 0:
+            self.write_log("检测到空仓但残留入场价，重置风控状态")
+            self.entry_price = 0.0
+            self.highest_price = 0.0
+            self.lowest_price = 0.0
         self.write_log("策略启动（新闻情绪驱动 v2：风控+风险仓位+可选做空）")
 
     def on_stop(self) -> None:
@@ -82,20 +112,8 @@ class NewsSentimentStrategy(CtaTemplate):
 
     # ---------- 工具 ----------
     def _calc_size(self, price: float) -> int:
-        """按风险预算计算开仓股数，并取整到 lot_size、受仓位上限约束。"""
-        if price <= 0:
-            return 0
-        if self.risk_percent > 0 and self.stop_loss_pct > 0:
-            risk_amount = self.capital * self.risk_percent
-            per_share_risk = price * self.stop_loss_pct
-            size = int(risk_amount / per_share_risk)
-        else:
-            size = int(self.fixed_size)
-        max_size = int(self.capital * self.max_position_pct / price)
-        size = min(size, max_size)
-        if self.lot_size > 1:
-            size = size // self.lot_size * self.lot_size
-        return max(0, size)
+        return calc_size(price, self.fixed_size, self.risk_percent, self.stop_loss_pct,
+                         self.max_position_pct, self.lot_size, self.capital)
 
     def _open_long(self, price: float) -> None:
         size = self._calc_size(price)

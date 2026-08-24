@@ -20,11 +20,17 @@ import re
 # ---------- 中文 ----------
 
 CN_POS = ["利好", "增长", "上涨", "涨停", "突破", "超预期", "回购", "增持", "中标",
-          "盈利", "扭亏", "创新高", "获批", "签约", "分红", "业绩预增", "降准", "降息",
-          "刺激", "支持", "扩产", "提价", "涨价", "翻倍", "大涨", "回升", "走强"]
+          "盈利", "扭亏", "创新高", "获批", "签约", "分红", "业绩预增", "预增", "降准", "降息",
+          "刺激", "支持", "扩产", "提价", "涨价", "翻倍", "大涨", "回升", "回暖", "改善", "走强"]
 CN_NEG = ["利空", "下跌", "跌停", "亏损", "减持", "违规", "处罚", "立案", "调查",
           "退市", "风险", "爆雷", "商誉减值", "质押", "冻结", "诉讼", "下调", "不及预期",
-          "预亏", "停产", "召回", "违约", "债务", "暴跌", "走弱", "承压", "下挫"]
+          "预亏", "预减", "停产", "召回", "违约", "债务", "暴跌", "走弱", "承压", "下挫",
+          "下滑", "下降", "回落", "低于预期"]
+
+# 中文否定词（否定窗口用）。刻意排除单字“未/无/非/难”等歧义字，
+# 避免“未来”“无锡”“非洲”等词被误判为否定。
+CN_NEGATORS = ["不会", "不能", "未能", "没有", "并未", "不再", "尚未", "难以",
+               "无法", "避免", "缺乏", "不及", "不", "没", "负"]
 
 # ---------- 英文金融词典 ----------
 # 含空格或连字符的短语走子串匹配；单词走边界匹配 + 否定窗口。
@@ -87,12 +93,42 @@ def _negated(words, i: int) -> bool:
     return False
 
 
+def _occurrences(text: str, word: str) -> list:
+    """返回 word 在 text 中的所有起始下标（不重叠，等价于 str.count 的语义）。"""
+    idxs = []
+    start = 0
+    while True:
+        i = text.find(word, start)
+        if i < 0:
+            break
+        idxs.append(i)
+        start = i + len(word)
+    return idxs
+
+
+def _negated_before(text: str, pos: int) -> bool:
+    """判断 pos 前 4 字符窗口内是否出现否定词（中文否定窗口）。"""
+    window = text[max(0, pos - 4):pos]
+    return any(ng in window for ng in CN_NEGATORS)
+
+
 def score_text_zh(text: str) -> float:
     if not text:
         return 0.0
     t = str(text).lower()
-    pos = sum(t.count(w) for w in CN_POS)
-    neg = sum(t.count(w) for w in CN_NEG)
+    pos = neg = 0
+    for w in CN_POS:
+        for i in _occurrences(t, w):
+            if _negated_before(t, i):
+                neg += 1
+            else:
+                pos += 1
+    for w in CN_NEG:
+        for i in _occurrences(t, w):
+            if _negated_before(t, i):
+                pos += 1
+            else:
+                neg += 1
     if pos + neg == 0:
         return 0.0
     return (pos - neg) / (pos + neg + 1)

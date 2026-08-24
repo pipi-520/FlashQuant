@@ -52,7 +52,7 @@ sentiment:
   take_profit_pct: 0.0        # take profit (0=off)
   trailing_stop_pct: 0.0      # trailing stop (0=off)
   risk_percent: 0.0           # risk per trade as % of capital (>0 overrides fixed_size)
-  max_position_pct: 0.95
+  max_position_pct: 0.95    # max position as % of capital
 
 summary:
   enabled: true            # 是否用 LLM 生成日报综述（失败自动回退纯数据日报）
@@ -60,7 +60,6 @@ summary:
   api_base: ""             # 留空读 OPENAI_BASE_URL
   api_key: ""              # 留空读 OPENAI_API_KEY
   model: ""                # 留空读 OPENAI_MODEL，默认 gpt-4o-mini
-      # max position as % of capital
 
 backtest:
   start_date: "20240101"
@@ -83,11 +82,16 @@ monitor:
   themes_path: "news_aggregator/themes.yaml"
   top_constituents: 5            # 告警里展示每个板块前几只成分股
   board_cache_refresh_hours: 24  # 板块成分股缓存刷新周期
-  impact_min: 0.3               # 影响分告警阈值（只推高影响，避免刷屏/触发Server酱限流）
+  impact_min: 0.45              # 影响分告警阈值（只推高影响，避免刷屏/触发Server酱限流）
+                                # 校准后上调：0.3 时命中面过宽（实测一轮 381 条中 367 条触发）
+  # 个股影响映射（LLM 判断新闻利好/利空哪些股票，告警里附加；有延迟/成本，默认关）
+  stock_impact:
+    enabled: true               # true=命中主题时调 LLM 做个股映射
+    max_stocks: 6               # 每条新闻最多输出几只受影响股票
   # 推送开关（密钥留空则读取对应环境变量，见 push.py）
   push:
     wecom: true
-    serverchan: true
+    serverchan: false        # sendkey 失效（2026-08-24 实测 400 AUTH），改用企业微信
     telegram: false
     ntfy: false
   wecom_webhook: ""              # 企业微信，留空读 WECOM_WEBHOOK
@@ -104,22 +108,36 @@ primary:
   bargo_base_url: ""      # BARGO_BASE_URL（留空则跳过 Bargo）
   bargo_api_key: ""       # BARGO_API_KEY
   fred_api_key: ""        # FRED_API_KEY（美联储经济数据，可选）
+  finnhub_api_key: ""     # FINNHUB_API_KEY（美股近期新闻回填，免费 tier 约2周，可选）
 
 # 国会交易关注名单（留空=全部；命中才告警）
 politicians:
   - Nancy Pelosi
 
+# 反转因子策略（短期超跌买入，已通过随机对照与样本外检验，见 results/reversal_report.md）
+# 用法：.venv/Scripts/python.exe scripts/paper_trade.py --reversal
+reversal:
+  threshold: -0.02        # T-1 日收盘跌幅 <= 该值触发买入（-0.02 = 跌超 2%）
+  hold_days: 3            # 买入后第 N 个交易日收盘卖出（N=1 即次日收盘卖，满足 A股 T+1）
+  max_position_pct: 0.95  # 每账户仓位上限（占该账户资金）
+  rate: 0.0003            # 佣金率（双边）
+  slippage: 0.01          # 滑点（元/股）
+  universe: "data/universe_expanded.yaml"   # 标的池（42 只，每标的独立 100 万账户）
+
 # 影响分模型（news_aggregator/impact.py）：综合来源权威度/爆发系数/情绪强度/持仓相关性/主题热度
+# 权重经 2026-08-24 影响分校准（results/impact_calibration.md，36939 条新闻）：
+# burst（多源爆发）对次日波动无预测力（burst=1 样本次日反而平静），权重下调；
+# 有具体标的的新闻（公告/个股新闻）次日波动显著更大，relevance 权重上调。
 impact:
   window_minutes: 60          # 突发检测时间窗（分钟）
   burst_cap: 4                # 相似条数达到该值即 burst=1
   themes_path: "news_aggregator/themes.yaml"
   weights:
     authority: 0.20           # 来源权威度
-    burst: 0.20               # 爆发系数（多源同时报道）
+    burst: 0.05               # 爆发系数（校准显示无预测力，保留小权重）
     intensity: 0.25           # 情绪强度 |score|
-    relevance: 0.20           # 持仓/关注相关度
-    theme: 0.15               # 主题热度
+    relevance: 0.30           # 持仓/关注相关度（有标的的新闻波动显著更大）
+    theme: 0.20               # 主题热度
 
 
 
