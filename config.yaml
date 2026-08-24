@@ -74,7 +74,8 @@ backtest:
 news:
   # 启用的快讯源（留空则全部启用）
   enabled_sources: []  # 留空=全部启用
-  # 企业微信机器人 webhook：留空则读取环境变量 WECOM_WEBHOOK
+  # 日报专用企业微信机器人 webhook：留空则读取环境变量 WECOM_WEBHOOK_DAILY（再兜底 WECOM_WEBHOOK）
+  # 与 monitor.wecom_webhook（告警机器人）分开，避免告警高频触发群机器人限流殃及日报。
   wecom_webhook: ""
 monitor:
   poll_interval: 15              # 轮询秒数（10-60）
@@ -94,7 +95,7 @@ monitor:
     serverchan: false        # sendkey 失效（2026-08-24 实测 400 AUTH），改用企业微信
     telegram: false
     ntfy: false
-  wecom_webhook: ""              # 企业微信，留空读 WECOM_WEBHOOK
+  wecom_webhook: ""              # 企业微信【告警】机器人，留空读 WECOM_WEBHOOK（与日报机器人分开）
   serverchan_sendkey: ""         # Server酱，留空读 SERVERCHAN_SENDKEY
   telegram_token: ""             # 留空读 TELEGRAM_TOKEN
   telegram_chat_id: ""           # 留空读 TELEGRAM_CHAT_ID

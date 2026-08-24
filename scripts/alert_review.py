@@ -182,7 +182,7 @@ def main() -> int:
         from news_aggregator.push import push_alert
         import yaml as _yaml
         cfg = _yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
-        push_alert(cfg, "告警闭环回看", "\n".join(lines[:18]))
+        push_alert(cfg, "告警闭环回看", "\n".join(lines[:18]), channel="daily")
         print("[review] 已推送到企业微信")
     return 0
 

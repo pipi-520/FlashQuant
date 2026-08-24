@@ -117,9 +117,13 @@ def send_ntfy(topic: str, title: str, message: str) -> bool:
 
 # ---------- 统一入口 ----------
 
-def push_alert(cfg: dict, title: str, content: str) -> dict:
+def push_alert(cfg: dict, title: str, content: str, channel: str = "monitor") -> dict:
     """按 config['monitor']['push'] 多通道发送告警。返回各通道结果。
 
+    channel:
+      - "monitor"（默认）：实时事件告警，企业微信用 monitor.wecom_webhook / WECOM_WEBHOOK
+      - "daily"：每日日报，企业微信用 news.wecom_webhook / WECOM_WEBHOOK_DAILY
+        （分开两个群机器人，避免告警高频触发群机器人限流殃及日报）
     密钥读取优先级：config -> 环境变量。
     """
     m = (cfg.get("monitor") or {})
@@ -129,9 +133,13 @@ def push_alert(cfg: dict, title: str, content: str) -> dict:
 
     results = {}
     if pc.get("wecom", True):
-        webhook = (m.get("wecom_webhook") or ""
-                   or (cfg.get("news") or {}).get("wecom_webhook") or ""
-                   or os.environ.get("WECOM_WEBHOOK", ""))
+        if channel == "daily":
+            webhook = ((cfg.get("news") or {}).get("wecom_webhook") or ""
+                       or os.environ.get("WECOM_WEBHOOK_DAILY", "")
+                       or os.environ.get("WECOM_WEBHOOK", ""))
+        else:
+            webhook = (m.get("wecom_webhook") or ""
+                       or os.environ.get("WECOM_WEBHOOK", ""))
         results["wecom"] = send_wecom_markdown(webhook, content)
 
     if pc.get("serverchan", True):

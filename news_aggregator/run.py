@@ -407,7 +407,7 @@ def main() -> int:
     print(f"[agg] daily_sentiment -> {NEWS_DIR / 'daily_sentiment.json'}")
 
     if args.push:
-        push_alert(cfg, "财经新闻舆情日报", md)
+        push_alert(cfg, "财经新闻舆情日报", md, channel="daily")
 
     return 0
 
